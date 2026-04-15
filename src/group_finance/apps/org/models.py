@@ -1,7 +1,7 @@
 from django.db import models
 
 from group_finance.apps.core.models import ActiveMixin, NoteMixin, TimeStampedModel
-
+from group_finance.apps.core.utils.code_generator import generate_unique_code
 
 class Company(TimeStampedModel, NoteMixin, ActiveMixin):
     class CompanyType(models.TextChoices):
@@ -36,7 +36,13 @@ class Company(TimeStampedModel, NoteMixin, ActiveMixin):
 
 class BusinessDirection(TimeStampedModel, NoteMixin, ActiveMixin):
     name = models.CharField("Название", max_length=255)
-    code = models.CharField("Код", max_length=50, unique=True)
+    code = models.CharField(
+        "Код",
+        max_length=50,
+        unique=True,
+        blank=True,
+        help_text="Если оставить пустым, код будет сгенерирован автоматически.",
+    )
     company = models.ForeignKey(
         Company,
         on_delete=models.CASCADE,
@@ -55,6 +61,15 @@ class BusinessDirection(TimeStampedModel, NoteMixin, ActiveMixin):
             )
         ]
 
+    def save(self, *args, **kwargs):
+        if (self.code is None or self.code == "") and self.name:
+            self.code = generate_unique_code(
+                model_class=type(self),
+                name=self.name,
+                instance_pk=self.pk,
+        )
+        super().save(*args, **kwargs)
+        
     def __str__(self) -> str:
         return self.name
     
