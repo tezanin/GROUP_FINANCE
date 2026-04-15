@@ -1,0 +1,165 @@
+﻿from django.db import migrations, models
+import django.db.models.deletion
+
+
+class Migration(migrations.Migration):
+    initial = True
+
+    dependencies = []
+
+    operations = [
+        migrations.CreateModel(
+            name="Currency",
+            fields=[
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                (
+                    "created_at",
+                    models.DateTimeField(auto_now_add=True, verbose_name="Создано"),
+                ),
+                (
+                    "updated_at",
+                    models.DateTimeField(auto_now=True, verbose_name="Обновлено"),
+                ),
+                (
+                    "is_active",
+                    models.BooleanField(default=True, verbose_name="Активна"),
+                ),
+                (
+                    "code",
+                    models.CharField(max_length=3, unique=True, verbose_name="Код"),
+                ),
+                (
+                    "name",
+                    models.CharField(max_length=128, verbose_name="Название"),
+                ),
+            ],
+            options={
+                "verbose_name": "Валюта",
+                "verbose_name_plural": "Валюты",
+                "ordering": ("code",),
+            },
+        ),
+        migrations.CreateModel(
+            name="ExchangeRateSource",
+            fields=[
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                (
+                    "created_at",
+                    models.DateTimeField(auto_now_add=True, verbose_name="Создано"),
+                ),
+                (
+                    "updated_at",
+                    models.DateTimeField(auto_now=True, verbose_name="Обновлено"),
+                ),
+                (
+                    "note",
+                    models.TextField(blank=True, verbose_name="Примечание"),
+                ),
+                (
+                    "code",
+                    models.CharField(max_length=50, unique=True, verbose_name="Код"),
+                ),
+                (
+                    "name",
+                    models.CharField(max_length=128, verbose_name="Название"),
+                ),
+                (
+                    "is_manual",
+                    models.BooleanField(default=False, verbose_name="Ручной источник"),
+                ),
+            ],
+            options={
+                "verbose_name": "Источник курса",
+                "verbose_name_plural": "Источники курсов",
+                "ordering": ("name", "code"),
+            },
+        ),
+        migrations.CreateModel(
+            name="ExchangeRate",
+            fields=[
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                (
+                    "created_at",
+                    models.DateTimeField(auto_now_add=True, verbose_name="Создано"),
+                ),
+                (
+                    "updated_at",
+                    models.DateTimeField(auto_now=True, verbose_name="Обновлено"),
+                ),
+                (
+                    "note",
+                    models.TextField(blank=True, verbose_name="Примечание"),
+                ),
+                (
+                    "rate_date",
+                    models.DateField(verbose_name="Дата курса"),
+                ),
+                (
+                    "rate_to_rub",
+                    models.DecimalField(
+                        decimal_places=8,
+                        max_digits=20,
+                        verbose_name="Курс к RUB",
+                    ),
+                ),
+                (
+                    "is_manual_override",
+                    models.BooleanField(default=False, verbose_name="Ручная корректировка"),
+                ),
+                (
+                    "currency",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.PROTECT,
+                        related_name="exchange_rates",
+                        to="core.currency",
+                        verbose_name="Валюта",
+                    ),
+                ),
+                (
+                    "source",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.PROTECT,
+                        related_name="exchange_rates",
+                        to="core.exchangeratesource",
+                        verbose_name="Источник",
+                    ),
+                ),
+            ],
+            options={
+                "verbose_name": "Курс валюты",
+                "verbose_name_plural": "Курсы валют",
+                "ordering": ("-rate_date", "currency__code", "source__name"),
+            },
+        ),
+        migrations.AddConstraint(
+            model_name="exchangerate",
+            constraint=models.UniqueConstraint(
+                fields=("currency", "rate_date", "source"),
+                name="unique_exchange_rate_per_currency_date_source",
+            ),
+        ),
+    ]
