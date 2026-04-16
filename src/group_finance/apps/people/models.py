@@ -1,4 +1,5 @@
 from django.conf import settings
+from django.core.exceptions import ValidationError
 from django.db import models
 
 from group_finance.apps.core.models import ActiveMixin, NoteMixin, TimeStampedModel
@@ -46,6 +47,14 @@ class Employee(TimeStampedModel, NoteMixin, ActiveMixin):
         verbose_name = "Сотрудник"
         verbose_name_plural = "Сотрудники"
         ordering = ("full_name",)
+
+    def clean(self):
+        super().clean()
+
+        if self.hire_date and self.fire_date and self.fire_date < self.hire_date:
+            raise ValidationError(
+                {"fire_date": "Дата увольнения не может быть раньше даты найма."}
+            )
 
     def __str__(self) -> str:
         return self.full_name

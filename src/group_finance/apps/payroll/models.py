@@ -1,8 +1,8 @@
+from django.core.exceptions import ValidationError
 from django.db import models
 
-from group_finance.apps.core.models import TimeStampedModel
+from group_finance.apps.core.models import Currency, TimeStampedModel
 from group_finance.apps.people.models import Employee
-from group_finance.apps.core.models import Currency
 
 
 class SalaryRate(TimeStampedModel):
@@ -67,6 +67,14 @@ class Payroll(TimeStampedModel):
         verbose_name = "Начисление зарплаты"
         verbose_name_plural = "Начисления зарплаты"
         ordering = ("-period_start",)
+
+    def clean(self):
+        super().clean()
+
+        if self.period_start and self.period_end and self.period_end < self.period_start:
+            raise ValidationError(
+                {"period_end": "Дата окончания периода не может быть раньше даты начала."}
+            )
 
     def __str__(self):
         return f"{self.employee} | {self.period_start} - {self.period_end} | {self.amount}"
