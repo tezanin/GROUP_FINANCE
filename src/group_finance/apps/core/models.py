@@ -1,6 +1,6 @@
 ﻿from django.conf import settings
 from django.db import models
-
+from group_finance.apps.core.utils.code_generator import generate_unique_code
 
 class TimeStampedModel(models.Model):
     created_at = models.DateTimeField(
@@ -15,7 +15,24 @@ class TimeStampedModel(models.Model):
     class Meta:
         abstract = True
 
+class CodeMixin(models.Model):
+    class Meta:
+        abstract = True
 
+    def save(self, *args, **kwargs):
+        code_value = getattr(self, "code", None)
+        name_value = getattr(self, "name", None)
+
+        if (code_value is None or code_value == "") and name_value:
+            self.code = generate_unique_code(
+                model_class=type(self),
+                name=name_value,
+                instance_pk=self.pk,
+            )
+
+        self.full_clean()
+        super().save(*args, **kwargs)
+        
 class NoteMixin(models.Model):
     note = models.TextField(
         blank=True,

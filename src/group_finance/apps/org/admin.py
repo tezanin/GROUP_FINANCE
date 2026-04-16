@@ -3,6 +3,9 @@ from django.contrib import admin
 from .models import BankAccount, BusinessDirection, Client, Company, Project
 
 
+# ---------------------
+# Company
+# ---------------------
 @admin.register(Company)
 class CompanyAdmin(admin.ModelAdmin):
     list_display = (
@@ -28,9 +31,7 @@ class CompanyAdmin(admin.ModelAdmin):
             )
         }),
         ("Реквизиты", {
-            "fields": (
-                "tax_id",
-            )
+            "fields": ("tax_id",)
         }),
         ("Дополнительно", {
             "fields": (
@@ -41,6 +42,9 @@ class CompanyAdmin(admin.ModelAdmin):
     )
 
 
+# ---------------------
+# BusinessDirection
+# ---------------------
 @admin.register(BusinessDirection)
 class BusinessDirectionAdmin(admin.ModelAdmin):
     list_display = ("name", "code", "company", "is_active")
@@ -65,6 +69,9 @@ class BusinessDirectionAdmin(admin.ModelAdmin):
     )
 
 
+# ---------------------
+# Client
+# ---------------------
 @admin.register(Client)
 class ClientAdmin(admin.ModelAdmin):
     list_display = ("name", "company", "tax_id", "is_active")
@@ -89,14 +96,22 @@ class ClientAdmin(admin.ModelAdmin):
     )
 
 
+# ---------------------
+# Project
+# ---------------------
 @admin.register(Project)
 class ProjectAdmin(admin.ModelAdmin):
-    list_display = ("name", "code", "company", "business_direction", "client", "is_active")
+    list_display = (
+        "name",
+        "code",
+        "company",
+        "business_direction",
+        "client",
+        "is_active",
+    )
     search_fields = ("name", "code", "company__name", "client__name")
     list_filter = ("company", "business_direction", "is_active")
     autocomplete_fields = ("company", "business_direction", "client")
-
-    prepopulated_fields = {"code": ("name",)}
 
     fieldsets = (
         ("Основное", {
@@ -117,9 +132,19 @@ class ProjectAdmin(admin.ModelAdmin):
     )
 
 
+# ---------------------
+# BankAccount
+# ---------------------
 @admin.register(BankAccount)
 class BankAccountAdmin(admin.ModelAdmin):
-    list_display = ("company", "bank_name", "account_number", "currency", "is_primary", "is_active")
+    list_display = (
+        "company",
+        "bank_name",
+        "account_number",
+        "currency",
+        "is_primary",
+        "is_active",
+    )
     search_fields = ("company__name", "bank_name", "account_number")
     list_filter = ("company", "currency", "is_primary", "is_active")
     autocomplete_fields = ("company", "currency")
@@ -140,8 +165,6 @@ class BankAccountAdmin(admin.ModelAdmin):
             )
         }),
         ("Дополнительно", {
-            "fields": (
-                "note",
-            )
+            "fields": ("note",)
         }),
     )

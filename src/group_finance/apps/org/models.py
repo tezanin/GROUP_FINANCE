@@ -1,6 +1,7 @@
 from django.db import models
+from django.core.exceptions import ValidationError
 
-from group_finance.apps.core.models import ActiveMixin, NoteMixin, TimeStampedModel
+from group_finance.apps.core.models import ActiveMixin, NoteMixin, TimeStampedModel, CodeMixin
 from group_finance.apps.core.utils.code_generator import generate_unique_code
 
 class Company(TimeStampedModel, NoteMixin, ActiveMixin):
@@ -71,7 +72,8 @@ class BusinessDirection(TimeStampedModel, NoteMixin, ActiveMixin):
         super().save(*args, **kwargs)
         
     def __str__(self) -> str:
-        return self.name
+        company_name = self.company.short_name or self.company.name
+        return f"{self.name} ({company_name})"
     
 class Client(TimeStampedModel, NoteMixin, ActiveMixin):
     name = models.CharField("Название", max_length=255)
@@ -100,7 +102,13 @@ class Client(TimeStampedModel, NoteMixin, ActiveMixin):
 
 class Project(TimeStampedModel, NoteMixin, ActiveMixin):
     name = models.CharField("Название", max_length=255)
-    code = models.CharField("Код", max_length=50, unique=True)
+    code = models.CharField(
+        "Код",
+        max_length=50,
+        unique=True,
+        blank=True,
+        help_text="Если оставить пустым, код будет сгенерирован автоматически.",
+    )
     company = models.ForeignKey(
         Company,
         on_delete=models.CASCADE,
@@ -131,6 +139,19 @@ class Project(TimeStampedModel, NoteMixin, ActiveMixin):
         verbose_name_plural = "Проекты"
         ordering = ("name",)
 
+    def clean(self):
+        super().clean()
+
+        if self.business_direction and self.company:
+            if self.business_direction.company_id != self.company_id:
+                raise ValidationError({
+                    "business_direction": "Направление бизнеса должно относиться к выбранной компании."
+                })
+    
+#    def save(self, *args, **kwargs):
+#        self.full_clean()
+#        super().save(*args, **kwargs)
+            
     def __str__(self) -> str:
         return self.name
 
