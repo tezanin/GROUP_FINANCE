@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import BankAccount, BusinessDirection, Client, Company, Project
+from .models import BankAccount, BusinessDirection, Client, Company, Project, Bank
 
 
 # ---------------------
@@ -131,6 +131,34 @@ class ProjectAdmin(admin.ModelAdmin):
         }),
     )
 
+# ---------------------
+# Bank
+# ---------------------
+@admin.register(Bank)
+class BankAdmin(admin.ModelAdmin):
+    list_display = ("name", "short_name", "code", "country", "bic", "address", "is_active")
+    search_fields = ("name", "short_name", "code", "bic")
+    list_filter = ( "is_active", "country")
+    # autocomplete_fields = ("country",)
+
+    fieldsets = (
+        ("Основное", {
+            "fields": (
+                "name",
+                "short_name",
+                "code",
+                "country",
+                "bic",
+                "address",
+            )
+        }),
+        ("Дополнительно", {
+            "fields": (
+                "is_active",
+                "note",
+            )
+        }),
+    )
 
 # ---------------------
 # BankAccount
@@ -139,21 +167,26 @@ class ProjectAdmin(admin.ModelAdmin):
 class BankAccountAdmin(admin.ModelAdmin):
     list_display = (
         "company",
-        "bank_name",
+        "bank",
         "account_number",
         "currency",
         "is_primary",
         "is_active",
     )
-    search_fields = ("company__name", "bank_name", "account_number")
-    list_filter = ("company", "currency", "is_primary", "is_active")
-    autocomplete_fields = ("company", "currency")
+    search_fields = (
+      "company__name",
+      "bank__name",
+      "bank__short_name",
+      "account_number",
+    )
+    list_filter = ("company", "bank", "currency", "is_primary", "is_active")
+    autocomplete_fields = ("company", "currency", "bank")
 
     fieldsets = (
         ("Основное", {
             "fields": (
                 "company",
-                "bank_name",
+                "bank",
                 "account_number",
                 "currency",
             )

@@ -35,7 +35,7 @@ class Company(TimeStampedModel, NoteMixin, ActiveMixin):
         return self.short_name or self.name
 
 
-class BusinessDirection(TimeStampedModel, NoteMixin, ActiveMixin):
+class BusinessDirection(CodeMixin, TimeStampedModel, NoteMixin, ActiveMixin):
     name = models.CharField("Название", max_length=255)
     code = models.CharField(
         "Код",
@@ -62,15 +62,6 @@ class BusinessDirection(TimeStampedModel, NoteMixin, ActiveMixin):
             )
         ]
 
-    def save(self, *args, **kwargs):
-        if (self.code is None or self.code == "") and self.name:
-            self.code = generate_unique_code(
-                model_class=type(self),
-                name=self.name,
-                instance_pk=self.pk,
-        )
-        super().save(*args, **kwargs)
-        
     def __str__(self) -> str:
         company_name = self.company.short_name or self.company.name
         return f"{self.name} ({company_name})"
@@ -100,7 +91,7 @@ class Client(TimeStampedModel, NoteMixin, ActiveMixin):
         return self.name
 
 
-class Project(TimeStampedModel, NoteMixin, ActiveMixin):
+class Project(CodeMixin, TimeStampedModel, NoteMixin, ActiveMixin):
     name = models.CharField("Название", max_length=255)
     code = models.CharField(
         "Код",
@@ -155,7 +146,32 @@ class Project(TimeStampedModel, NoteMixin, ActiveMixin):
     def __str__(self) -> str:
         return self.name
 
+class Bank(CodeMixin, TimeStampedModel, NoteMixin, ActiveMixin):
+    name = models.CharField("Название", max_length=255)
+    short_name = models.CharField("Краткое название", max_length=100, blank=True)
+    code = models.CharField(
+        "Код",
+        max_length=50,
+        unique=True,
+        blank=True,
+        help_text="Если оставить пустым, код будет сгенерирован автоматически.",
+    )
+    country = models.CharField("Код Страны", max_length=2,blank=True, help_text="2 символа - RU/KZ/BY")
+    bic = models.CharField("БИК / SWIFT", max_length=50, blank=True)
+    address = models.CharField("Адрес", max_length=255, blank=True)
+    class Meta:
+        verbose_name = "Банк"
+        verbose_name_plural = "Банки"
+        ordering = ("name",)
+        # constraints = [
+        #     models.UniqueConstraint(
+        #         fields=("bic",),
+        #         name="unique_bik_per_bank",
+        #     )
+        # ]
 
+    def __str__(self) -> str:
+            return self.short_name or self.name
 class BankAccount(TimeStampedModel, NoteMixin, ActiveMixin):
     company = models.ForeignKey(
         Company,
@@ -163,7 +179,14 @@ class BankAccount(TimeStampedModel, NoteMixin, ActiveMixin):
         related_name="bank_accounts",
         verbose_name="Компания",
     )
-    bank_name = models.CharField("Банк", max_length=255)
+    bank = models.ForeignKey(
+        "Bank",
+        on_delete=models.PROTECT,
+        related_name="bank_accounts",
+        verbose_name="Банк",
+        null=True,
+        blank=True,
+    )
     account_number = models.CharField("Номер счёта", max_length=100)
     currency = models.ForeignKey(
         "core.Currency",
@@ -176,7 +199,7 @@ class BankAccount(TimeStampedModel, NoteMixin, ActiveMixin):
     class Meta:
         verbose_name = "Банковский счёт"
         verbose_name_plural = "Банковские счета"
-        ordering = ("company__name", "bank_name", "account_number")
+        ordering = ("company__name", "bank", "account_number")
         constraints = [
             models.UniqueConstraint(
                 fields=("company", "account_number"),
@@ -185,4 +208,4 @@ class BankAccount(TimeStampedModel, NoteMixin, ActiveMixin):
         ]
 
     def __str__(self) -> str:
-        return f"{self.company} | {self.bank_name} | {self.account_number}"
+        return f"{self.company} | {self.bank} | {self.account_number}"
