@@ -1,7 +1,7 @@
+from django.core.exceptions import ValidationError
 from django.db import models
 
-from group_finance.apps.core.models import NoteMixin, TimeStampedModel
-from group_finance.apps.core.models import Currency
+from group_finance.apps.core.models import Currency, NoteMixin, TimeStampedModel
 from group_finance.apps.org.models import BusinessDirection, Company, Project
 
 
@@ -82,6 +82,29 @@ class Expense(TimeStampedModel, NoteMixin):
         verbose_name = "Расход"
         verbose_name_plural = "Расходы"
         ordering = ("-period_start", "-id")
+
+    def clean(self):
+        super().clean()
+
+        errors = {}
+
+        if self.period_start and self.period_end and self.period_end < self.period_start:
+            errors["period_end"] = "Дата окончания периода не может быть раньше даты начала."
+
+        if self.project_id and self.company_id and self.project.company_id != self.company_id:
+            errors["project"] = "Проект должен относиться к выбранной компании."
+
+        if (
+            self.business_direction_id
+            and self.company_id
+            and self.business_direction.company_id != self.company_id
+        ):
+            errors["business_direction"] = (
+                "Направление бизнеса должно относиться к выбранной компании."
+            )
+
+        if errors:
+            raise ValidationError(errors)
 
     def __str__(self) -> str:
         return f"{self.company} | {self.category} | {self.amount} {self.currency}"

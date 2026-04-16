@@ -8,6 +8,15 @@ class ExpenseCategoryAdmin(admin.ModelAdmin):
     list_display = ("name", "code")
     search_fields = ("name", "code")
 
+    fieldsets = (
+        ("Основное", {
+            "fields": (
+                "name",
+                "code",
+            )
+        }),
+    )
+
 
 @admin.register(Expense)
 class ExpenseAdmin(admin.ModelAdmin):
@@ -26,6 +35,7 @@ class ExpenseAdmin(admin.ModelAdmin):
     search_fields = (
         "company__name",
         "category__name",
+        "category__code",
         "project__name",
         "business_direction__name",
         "note",
@@ -44,4 +54,32 @@ class ExpenseAdmin(admin.ModelAdmin):
         "project",
         "business_direction",
         "currency",
+    )
+
+    fieldsets = (
+        ("Основное", {
+            "fields": (
+                "company",
+                "category",
+                "amount",
+                "currency",
+                "is_operational",
+            )
+        }),
+        ("Аналитика", {
+            "fields": (
+                "project",
+                "business_direction",
+            )
+        }),
+        ("Период", {
+            "fields": (
+                "period_start",
+                "period_end",
+                "recognized_date",
+            )
+        }),
+        ("Дополнительно", {
+            "fields": ("note",)
+        }),
     )

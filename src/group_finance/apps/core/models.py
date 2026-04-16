@@ -1,6 +1,9 @@
-﻿from django.conf import settings
+from django.conf import settings
+from django.core.exceptions import ValidationError
 from django.db import models
+
 from group_finance.apps.core.utils.code_generator import generate_unique_code
+
 
 class TimeStampedModel(models.Model):
     created_at = models.DateTimeField(
@@ -14,6 +17,7 @@ class TimeStampedModel(models.Model):
 
     class Meta:
         abstract = True
+
 
 class CodeMixin(models.Model):
     class Meta:
@@ -32,7 +36,8 @@ class CodeMixin(models.Model):
 
         self.full_clean()
         super().save(*args, **kwargs)
-        
+
+
 class NoteMixin(models.Model):
     note = models.TextField(
         blank=True,
@@ -134,11 +139,18 @@ class ExchangeRate(TimeStampedModel, NoteMixin):
             )
         ]
 
+    def clean(self):
+        super().clean()
+
+        if self.rate_to_rub is not None and self.rate_to_rub <= 0:
+            raise ValidationError({"rate_to_rub": "Курс должен быть больше нуля."})
+
     def __str__(self) -> str:
         return (
             f"{self.currency.code} {self.rate_date:%Y-%m-%d} "
             f"{self.rate_to_rub} ({self.source.name})"
         )
+
 
 class Comment(TimeStampedModel, NoteMixin, ActiveMixin):
     content = models.TextField("Текст комментария")
@@ -200,4 +212,3 @@ class AuditLog(TimeStampedModel):
 
     def __str__(self):
         return f"{self.entity_type}:{self.entity_id} [{self.action}]"
-

@@ -1,4 +1,4 @@
-﻿from django.contrib import admin
+from django.contrib import admin
 
 from .models import (
     Attachment,
@@ -16,12 +16,37 @@ class CurrencyAdmin(admin.ModelAdmin):
     search_fields = ("code", "name")
     list_filter = ("is_active",)
 
+    fieldsets = (
+        ("Основное", {
+            "fields": (
+                "code",
+                "name",
+            )
+        }),
+        ("Дополнительно", {
+            "fields": ("is_active",)
+        }),
+    )
+
 
 @admin.register(ExchangeRateSource)
 class ExchangeRateSourceAdmin(admin.ModelAdmin):
     list_display = ("code", "name", "is_manual", "created_at")
     search_fields = ("code", "name")
     list_filter = ("is_manual",)
+
+    fieldsets = (
+        ("Основное", {
+            "fields": (
+                "code",
+                "name",
+                "is_manual",
+            )
+        }),
+        ("Дополнительно", {
+            "fields": ("note",)
+        }),
+    )
 
 
 @admin.register(ExchangeRate)
@@ -34,9 +59,24 @@ class ExchangeRateAdmin(admin.ModelAdmin):
         "is_manual_override",
         "created_at",
     )
-    search_fields = ("currency__code", "source__name")
+    search_fields = ("currency__code", "currency__name", "source__code", "source__name")
     list_filter = ("source", "is_manual_override", "rate_date")
     autocomplete_fields = ("currency", "source")
+
+    fieldsets = (
+        ("Основное", {
+            "fields": (
+                "currency",
+                "source",
+                "rate_date",
+                "rate_to_rub",
+                "is_manual_override",
+            )
+        }),
+        ("Дополнительно", {
+            "fields": ("note",)
+        }),
+    )
 
 
 @admin.register(Comment)
@@ -46,6 +86,21 @@ class CommentAdmin(admin.ModelAdmin):
     list_filter = ("is_active", "created_at")
     autocomplete_fields = ("created_by",)
 
+    fieldsets = (
+        ("Основное", {
+            "fields": (
+                "content",
+                "created_by",
+            )
+        }),
+        ("Дополнительно", {
+            "fields": (
+                "is_active",
+                "note",
+            )
+        }),
+    )
+
 
 @admin.register(Attachment)
 class AttachmentAdmin(admin.ModelAdmin):
@@ -54,10 +109,42 @@ class AttachmentAdmin(admin.ModelAdmin):
     list_filter = ("is_active", "mime_type", "created_at")
     autocomplete_fields = ("uploaded_by",)
 
+    fieldsets = (
+        ("Основное", {
+            "fields": (
+                "file",
+                "original_name",
+                "uploaded_by",
+                "mime_type",
+                "size_bytes",
+            )
+        }),
+        ("Дополнительно", {
+            "fields": (
+                "is_active",
+                "note",
+            )
+        }),
+    )
+
 
 @admin.register(AuditLog)
 class AuditLogAdmin(admin.ModelAdmin):
     list_display = ("id", "entity_type", "entity_id", "action", "actor", "created_at")
-    search_fields = ("entity_type", "entity_id", "action")
+    search_fields = ("entity_type", "entity_id", "action", "actor__username")
     list_filter = ("action", "entity_type", "created_at")
     autocomplete_fields = ("actor",)
+
+    fieldsets = (
+        ("Основное", {
+            "fields": (
+                "entity_type",
+                "entity_id",
+                "action",
+                "actor",
+            )
+        }),
+        ("Данные", {
+            "fields": ("payload",)
+        }),
+    )

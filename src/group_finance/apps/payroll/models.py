@@ -1,31 +1,15 @@
 from django.core.exceptions import ValidationError
 from django.db import models
 
-from group_finance.apps.core.models import Currency, TimeStampedModel
+from group_finance.apps.core.models import Currency, NoteMixin, TimeStampedModel
+from group_finance.apps.org.models import Company
 from group_finance.apps.people.models import Employee
 
 
 class SalaryRate(TimeStampedModel):
-    employee = models.ForeignKey(
-        Employee,
-        on_delete=models.CASCADE,
-        related_name="salary_rates",
-        verbose_name="Сотрудник",
-    )
-
-    amount = models.DecimalField(
-        "Ставка",
-        max_digits=12,
-        decimal_places=2,
-    )
-
-    currency = models.ForeignKey(
-        Currency,
-        on_delete=models.PROTECT,
-        related_name="salary_rates",
-        verbose_name="Валюта",
-    )
-
+    employee = models.ForeignKey(Employee, on_delete=models.CASCADE, related_name="salary_rates", verbose_name="Сотрудник")
+    amount = models.DecimalField("Ставка", max_digits=12, decimal_places=2)
+    currency = models.ForeignKey(Currency, on_delete=models.PROTECT, related_name="salary_rates", verbose_name="Валюта")
     effective_from = models.DateField("Действует с")
 
     class Meta:
@@ -38,29 +22,11 @@ class SalaryRate(TimeStampedModel):
 
 
 class Payroll(TimeStampedModel):
-    employee = models.ForeignKey(
-        Employee,
-        on_delete=models.CASCADE,
-        related_name="payrolls",
-        verbose_name="Сотрудник",
-    )
-
+    employee = models.ForeignKey(Employee, on_delete=models.CASCADE, related_name="payrolls", verbose_name="Сотрудник")
     period_start = models.DateField("Начало периода")
     period_end = models.DateField("Конец периода")
-
-    amount = models.DecimalField(
-        "Сумма",
-        max_digits=14,
-        decimal_places=2,
-    )
-
-    currency = models.ForeignKey(
-        Currency,
-        on_delete=models.PROTECT,
-        related_name="payrolls",
-        verbose_name="Валюта",
-    )
-
+    amount = models.DecimalField("Сумма", max_digits=14, decimal_places=2)
+    currency = models.ForeignKey(Currency, on_delete=models.PROTECT, related_name="payrolls", verbose_name="Валюта")
     is_paid = models.BooleanField("Выплачено", default=False)
 
     class Meta:
@@ -70,11 +36,46 @@ class Payroll(TimeStampedModel):
 
     def clean(self):
         super().clean()
-
         if self.period_start and self.period_end and self.period_end < self.period_start:
-            raise ValidationError(
-                {"period_end": "Дата окончания периода не может быть раньше даты начала."}
-            )
+            raise ValidationError({"period_end": "Дата окончания периода не может быть раньше даты начала."})
 
     def __str__(self):
         return f"{self.employee} | {self.period_start} - {self.period_end} | {self.amount}"
+
+
+class PayrollPayment(TimeStampedModel, NoteMixin):
+    class Status(models.TextChoices):
+        PLANNED = "planned", "Запланирован"
+        PAID = "paid", "Выплачен"
+        FAILED = "failed", "Ошибка"
+
+    company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name="payroll_payments", verbose_name="Компания")
+    employee = models.ForeignKey(Employee, on_delete=models.CASCADE, related_name="payroll_payments", verbose_name="Сотрудник")
+    payroll = models.ForeignKey(Payroll, on_delete=models.PROTECT, related_name="payments", verbose_name="Начисление", null=True, blank=True)
+    payment_date = models.DateField("Дата выплаты")
+    amount = models.DecimalField("Сумма", max_digits=14, decimal_places=2)
+    currency = models.ForeignKey(Currency, on_delete=models.PROTECT, related_name="payroll_payments", verbose_name="Валюта")
+    status = models.CharField("Статус", max_length=20, choices=Status.choices, default=Status.PLANNED)
+
+    class Meta:
+        verbose_name = "Выплата зарплаты"
+        verbose_name_plural = "Выплаты зарплаты"
+        ordering = ("-payment_date", "-id")
+
+    def clean(self):
+        super().clean()
+        errors = {}
+        if self.amount is not None and self.amount <= 0:
+            errors["amount"] = "Сумма выплаты должна быть больше нуля."
+        if self.employee_id and self.company_id and self.employee.company_id != self.company_id:
+            errors["employee"] = "Сотрудник должен относиться к выбранной компании."
+        if self.payroll_id:
+            if self.employee_id and self.payroll.employee_id != self.employee_id:
+                errors["payroll"] = "Начисление должно относиться к выбранному сотруднику."
+            if self.currency_id and self.payroll.currency_id != self.currency_id:
+                errors["currency"] = "Валюта выплаты должна совпадать с валютой начисления."
+        if errors:
+            raise ValidationError(errors)
+
+    def __str__(self):
+        return f"{self.employee} | {self.payment_date} | {self.amount}"
