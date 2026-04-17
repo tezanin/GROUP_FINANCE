@@ -20,4 +20,7 @@ build/
 
 #backup
 backups/
+
+#documents
 doc/
+docs/
