@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<title>Нормализатор банковских выписок</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:Arial,sans-serif;background:#f4f7fc;color:#1a202c;min-height:100vh}
+.wrap{max-width:1200px;margin:0 auto;padding:24px}
+header{background:#1F4E79;color:#fff;padding:20px 24px;border-radius:12px;margin-bottom:24px}
+header h1{font-size:20px;font-weight:700}
+header p{font-size:13px;opacity:.8;margin-top:4px}
+.drop{border:2px dashed #4A90D9;border-radius:12px;padding:48px 24px;text-align:center;background:#fff;cursor:pointer;transition:.2s;margin-bottom:20px}
+.drop:hover,.drop.over{border-color:#1F4E79;background:#EBF4FF}
+.drop h3{font-size:17px;color:#1F4E79;margin-bottom:8px}
+.drop p{color:#666;font-size:13px}
+input[type=file]{display:none}
+.btn{padding:9px 18px;border-radius:8px;border:none;cursor:pointer;font-size:13px;font-weight:600;transition:.2s}
+.bp{background:#1F4E79;color:#fff}.bp:hover{background:#163d5e}.bp:disabled{background:#9CA3AF;cursor:not-allowed}
+.bs{background:#fff;color:#1F4E79;border:1.5px solid #1F4E79}.bs:hover{background:#EBF4FF}
+.bd{background:#FEE2E2;color:#DC2626}.bd:hover{background:#FECACA}
+.actions{display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;align-items:center}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:14px;margin-bottom:20px}
+.sc{background:#fff;border-radius:10px;padding:14px;box-shadow:0 1px 4px rgba(0,0,0,.08)}
+.sc .v{font-size:26px;font-weight:700;color:#1F4E79}
+.sc .l{font-size:12px;color:#666;margin-top:4px}
+.tw{background:#fff;border-radius:12px;overflow:auto;box-shadow:0 1px 4px rgba(0,0,0,.08);max-height:480px;margin-bottom:8px}
+table{width:100%;border-collapse:collapse;font-size:12px}
+thead{background:#1F4E79;color:#fff;position:sticky;top:0}
+th{padding:10px 8px;text-align:left;white-space:nowrap;font-weight:600}
+td{padding:8px;border-bottom:1px solid #F3F4F6;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:top}
+tr:hover td{background:#EBF4FF}
+tr:nth-child(even) td{background:#F8FAFF}
+tr:nth-child(even):hover td{background:#EBF4FF}
+.in{color:#059669;font-weight:700}.out{color:#DC2626;font-weight:700}
+.err{background:#FEF2F2;border:1px solid #FECACA;border-radius:8px;padding:12px 16px;margin-bottom:16px}
+.err h4{color:#DC2626;font-size:13px;margin-bottom:6px}
+.err ul{list-style:disc;padding-left:18px;font-size:12px;color:#7F1D1D}
+.empty{text-align:center;padding:60px 24px;color:#9CA3AF}
+.empty div{font-size:56px;margin-bottom:14px}
+.loading{text-align:center;padding:32px;color:#4A90D9}
+.spin{display:inline-block;width:30px;height:30px;border:3px solid #EBF4FF;border-top-color:#1F4E79;border-radius:50%;animation:spin 1s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.hint{font-size:12px;color:#888;padding:6px 0}
+.tag{display:inline-block;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:600;margin-left:6px}
+.t-kz{background:#FEF3C7;color:#92400E}
+.t-ru{background:#DBEAFE;color:#1E40AF}
+.t-by{background:#D1FAE5;color:#065F46}
+.t-uk{background:#F3F4F6;color:#6B7280}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <h1>🏦 Нормализатор банковских выписок</h1>
+  <p>Преобразует выписки ДримСофт KZ · ПрайдСофт · ДримСофт РБ в единый CSV для загрузки в БД</p>
+</header>
+
+<div class="drop" id="dz">
+  <div style="font-size:44px;margin-bottom:10px">📂</div>
+  <h3>Перетащите файлы или нажмите для выбора</h3>
+  <p>XLSX, XLS — Россия и Беларусь &nbsp;·&nbsp; PDF — Казахстан</p>
+  <br>
+  <button class="btn bs" onclick="document.getElementById('fi').click()">Выбрать файлы</button>
+  <input type="file" id="fi" multiple accept=".xlsx,.xls,.pdf">
+</div>
+
+<div id="errDiv" style="display:none" class="err">
+  <h4>⚠ Ошибки при обработке:</h4>
+  <ul id="errList"></ul>
+</div>
+
+<div id="loadDiv" style="display:none" class="loading">
+  <div class="spin"></div><p style="margin-top:10px">Обработка…</p>
+</div>
+
+<div id="main" style="display:none">
+  <div class="stats">
+    <div class="sc"><div class="v" id="sTotal">0</div><div class="l">Транзакций</div></div>
+    <div class="sc"><div class="v" id="sFiles">0</div><div class="l">Файлов</div></div>
+    <div class="sc"><div class="v" id="sIn">0</div><div class="l">ПРИХОД</div></div>
+    <div class="sc"><div class="v" id="sOut">0</div><div class="l">РАСХОД</div></div>
+  </div>
+  <div class="actions">
+    <button class="btn bp" onclick="dlCSV()">⬇ Скачать CSV</button>
+    <button class="btn bs" onclick="document.getElementById('fi').click()">+ Добавить файлы</button>
+    <button class="btn bd" onclick="clearAll()">🗑 Очистить</button>
+    <span id="fNames" style="font-size:12px;color:#666"></span>
+  </div>
+  <div class="tw"><table>
+    <thead><tr>
+      <th>Дата</th><th>↕</th><th>Сумма</th><th>Валюта</th>
+      <th>Контрагент</th><th>ИД</th><th>Счёт контрагента</th>
+      <th>Банк</th><th>Код</th><th>Назначение</th>
+    </tr></thead>
+    <tbody id="tb"></tbody>
+  </table></div>
+  <p class="hint">Предпросмотр: первые 300 строк из <span id="totalLbl">0</span>. В CSV попадут все.</p>
+</div>
+
+<div id="emptyDiv" class="empty">
+  <div>📊</div>
+  <p style="font-size:16px;font-weight:600;margin-bottom:8px">Загрузите файлы банковских выписок</p>
+  <p style="font-size:13px">Автоматически определит формат и нормализует данные</p>
+</div>
+</div>
+
+<script>
+const OUR_BIN_KZ = "230640008737";
+const OUR_INN_RU = "9715500079";
+const FIELDS = ["id","company","our_account","doc_number","date","direction",
+  "amount","currency","counterparty_name","counterparty_id","counterparty_id_type",
+  "counterparty_account","counterparty_bank","counterparty_bik","payment_code","purpose"];
+
+let rows = [], files = [], errs = [];
+
+// ── utils ──────────────────────────────────────────────────────────────────
+function uid(){
+  return crypto.randomUUID ? crypto.randomUUID() :
+    'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,c=>{
+      const r=Math.random()*16|0; return(c==='x'?r:(r&3|8)).toString(16);});
+}
+function cl(s){return String(s||'').replace(/[\r\n]+/g,' ').replace(/\s+/g,' ').trim()}
+function cid(s){return String(s||'').replace(/\s+/g,'').replace(/\.0$/,'')}
+function amt(s){
+  if(s===null||s===undefined||s==='') return null;
+  const v=parseFloat(String(s).replace(/\s/g,'').replace(',','.'));
+  return isNaN(v)?null:Math.abs(v);
+}
+function fmtDate(v){
+  if(!v) return '';
+  if(typeof v==='number'){
+    // Excel serial
+    const d=XLSX.SSF.parse_date_code(v);
+    if(d) return `${d.y}-${String(d.m).padStart(2,'0')}-${String(d.d).padStart(2,'0')}`;
+  }
+  const s=String(v).trim().replace(/(\d{2}\.\d{2}\.\d{3})\s+(\d)/,'$1$2');
+  const m=s.match(/^(\d{2})\.(\d{2})\.(\d{4})/);
+  if(m) return `${m[3]}-${m[2]}-${m[1]}`;
+  const m2=s.match(/^(\d{4}-\d{2}-\d{2})/);
+  if(m2) return m2[1];
+  return s.slice(0,10);
+}
+function byBic(acc){
+  const s=cid(acc);
+  return s.startsWith('BY')&&s.length>=8?s.slice(4,8):'';
+}
+function vo(p){const m=String(p||'').match(/\{VO(\d+)\}/);return m?m[1]:''}
+function accBank(raw){
+  const s=cl(raw),i=s.indexOf(',');
+  return i<0?[s.replace(/\s/g,''),'']: [s.slice(0,i).replace(/\s/g,''),s.slice(i+1).trim()];
+}
+function mk(o){return{id:uid(),...o}}
+
+// ── format detection ────────────────────────────────────────────────────────
+function detect(wb){
+  const sn=wb.SheetNames;
+  if(sn.some(n=>n.startsWith('Операции'))) return 'ru-tochka';
+  if(sn.includes('Выписка по счёту')) return 'ru-alfa';
+  const ws=wb.Sheets[sn[0]];
+  const d=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
+  if(!d.length) return 'unknown';
+  const h=d[0].map(c=>String(c).trim());
+  if(h.includes('Плательщик')) return 'by-income';
+  if(h.includes('Получатель')) return 'by-expense';
+  return 'unknown';
+}
+
+// ── BY income ───────────────────────────────────────────────────────────────
+function parseByIncome(wb){
+  const ws=wb.Sheets[wb.SheetNames[0]];
+  const d=XLSX.utils.sheet_to_json(ws,{header:1,defval:'',raw:false});
+  const h=d[0].map(c=>String(c).trim());
+  const gi=n=>h.indexOf(n);
+  const iD=gi('Дата'),iN=gi('Номер'),iS=gi('Сумма'),iC=gi('Валюта');
+  const iP=gi('Плательщик'),iU=gi('УНП'),iPu=gi('Назначение платежа');
+  const iOA=gi('Банковский счет'),iCA=gi('Счет плательщика');
+  return d.slice(1).filter(r=>r[iD]&&r[iP]).map(r=>{
+    const a=amt(r[iS]); if(!a) return null;
+    const [oa]=accBank(r[iOA]);
+    const [ca,cb]=accBank(r[iCA]||'');
+    const u=cid(r[iU]);
+    return mk({company:'ДримСофт РБ',our_account:oa,doc_number:cl(r[iN]),
+      date:fmtDate(r[iD]),direction:'ПРИХОД',amount:a,currency:cl(r[iC])||'BYN',
+      counterparty_name:cl(r[iP]),counterparty_id:u==='0'?'':u,counterparty_id_type:'УНП',
+      counterparty_account:ca,counterparty_bank:cb,counterparty_bik:byBic(ca),
+      payment_code:'',purpose:cl(r[iPu])});
+  }).filter(Boolean);
+}
+
+// ── BY expense ──────────────────────────────────────────────────────────────
+function parseByExpense(wb){
+  const ws=wb.Sheets[wb.SheetNames[0]];
+  const d=XLSX.utils.sheet_to_json(ws,{header:1,defval:'',raw:false});
+  const h=d[0].map(c=>String(c).trim());
+  const gi=n=>h.indexOf(n);
+  const iD=gi('Дата'),iN=gi('Номер'),iS=gi('Сумма'),iC=gi('Валюта');
+  const iR=gi('Получатель'),iU=gi('УНП'),iPu=gi('Назначение платежа');
+  const iOA=gi('Банковский счет'),iCA=gi('Счет получателя');
+  return d.slice(1).filter(r=>r[iD]).map(r=>{
+    const a=amt(r[iS]); if(!a) return null;
+    const [oa]=accBank(r[iOA]);
+    const [ca,cb]=accBank(iCA>=0?r[iCA]||'':'');
+    const u=cid(r[iU]);
+    return mk({company:'ДримСофт РБ',our_account:oa,doc_number:cl(r[iN]),
+      date:fmtDate(r[iD]),direction:'РАСХОД',amount:a,currency:cl(r[iC])||'BYN',
+      counterparty_name:cl(r[iR]),counterparty_id:u==='0'?'':u,counterparty_id_type:'УНП',
+      counterparty_account:ca,counterparty_bank:cb,counterparty_bik:byBic(ca),
+      payment_code:'',purpose:cl(r[iPu])});
+  }).filter(Boolean);
+}
+
+// ── RU Точка ────────────────────────────────────────────────────────────────
+function parseRuTochka(wb){
+  const sn=wb.SheetNames.find(n=>n.startsWith('Операции'));
+  const d=XLSX.utils.sheet_to_json(wb.Sheets[sn],{header:1,defval:'',raw:false});
+  let hi=0;
+  for(let i=0;i<Math.min(5,d.length);i++){
+    if(d[i].some(c=>String(c).includes('Контрагент'))){hi=i;break;}
+  }
+  const h=d[hi].map(c=>String(c).trim());
+  const gi=n=>{const i=h.indexOf(n);return i>=0?i:-1};
+  const iNum=gi('Номер документа'),iDate=gi('Дата операции')<0?gi('Дата документа'):gi('Дата операции');
+  const iAcc=gi('Счёт'),iCp=gi('Контрагент'),iInn=gi('ИНН контрагента');
+  const iBik=gi('БИК банка контрагента'),iBank=gi('Наименование банка контрагента');
+  const iCpA=gi('Счёт контрагента'),iDeb=gi('Списание'),iCre=gi('Зачисление');
+  const iPu=gi('Назначение платежа');
+  return d.slice(hi+1).map(r=>{
+    const deb=amt(r[iDeb]),cre=amt(r[iCre]);
+    let dir,a;
+    if(deb&&deb>0){dir='РАСХОД';a=deb;}
+    else if(cre&&cre>0){dir='ПРИХОД';a=cre;}
+    else return null;
+    const inn=cid(r[iInn]);
+    if(inn===OUR_INN_RU) return null;
+    const p=cl(r[iPu]);
+    return mk({company:'ПрайдСофт',our_account:cl(r[iAcc])||'40702810820000210749',
+      doc_number:cl(r[iNum]),date:fmtDate(r[iDate]),direction:dir,amount:a,currency:'RUB',
+      counterparty_name:cl(r[iCp]),counterparty_id:inn==='0'?'':inn,counterparty_id_type:'ИНН',
+      counterparty_account:cid(r[iCpA]),counterparty_bank:cl(r[iBank]),
+      counterparty_bik:cl(r[iBik]),payment_code:vo(p),purpose:p});
+  }).filter(Boolean);
+}
+
+// ── RU Альфа ────────────────────────────────────────────────────────────────
+function parseRuAlfa(wb){
+  const d=XLSX.utils.sheet_to_json(wb.Sheets['Выписка по счёту'],{header:1,defval:'',raw:false});
+  let oa='40702810332690001559',ds=12;
+  for(let i=0;i<d.length;i++){
+    const row=d[i].join(' ');
+    const m=row.match(/407\d{17}/);
+    if(m) oa=m[0];
+    if(String(d[i][0]).trim()==='Дата'){ds=i+2;break;}
+  }
+  return d.slice(ds).filter(r=>r[0]).map(r=>{
+    const deb=amt(r[2]),cre=amt(r[3]);
+    let dir,a;
+    if(deb&&deb>0){dir='РАСХОД';a=deb;}
+    else if(cre&&cre>0){dir='ПРИХОД';a=cre;}
+    else return null;
+    const inn=cid(r[5]);
+    if(inn===OUR_INN_RU) return null;
+    const p=cl(r[10]);
+    return mk({company:'ПрайдСофт',our_account:oa,
+      doc_number:cl(r[1]),date:fmtDate(r[0]),direction:dir,amount:a,currency:'RUB',
+      counterparty_name:cl(r[4]),counterparty_id:inn==='0'?'':inn,counterparty_id_type:'ИНН',
+      counterparty_account:cid(r[7]),counterparty_bank:cl(r[9]),
+      counterparty_bik:cl(r[8]),payment_code:vo(p),purpose:p});
+  }).filter(Boolean);
+}
+
+// ── KZ PDF ──────────────────────────────────────────────────────────────────
+let pdfLib=null;
+function loadPdf(){
+  if(pdfLib) return Promise.resolve(pdfLib);
+  return new Promise((res,rej)=>{
+    const s=document.createElement('script');
+    s.src='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+    s.onload=()=>{
+      const lib=window.pdfjsLib;
+      lib.GlobalWorkerOptions.workerSrc=
+        'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+      pdfLib=lib; res(lib);
+    };
+    s.onerror=rej;
+    document.body.appendChild(s);
+  });
+}
+
+function groupRows(items,tol=6){
+  if(!items.length) return [];
+  const s=[...items].sort((a,b)=>a.y-b.y);
+  const g=[];let cur=[s[0]],ref=s[0].y;
+  for(let i=1;i<s.length;i++){
+    if(Math.abs(s[i].y-ref)<=tol){cur.push(s[i]);ref=s[i].y;}
+    else{g.push(cur.sort((a,b)=>a.x-b.x));cur=[s[i]];ref=s[i].y;}
+  }
+  g.push(cur.sort((a,b)=>a.x-b.x));
+  return g;
+}
+
+function assignCol(x,bounds){
+  for(let i=0;i<bounds.length-1;i++) if(x>=bounds[i]&&x<bounds[i+1]) return i;
+  return bounds.length-1;
+}
+
+async function parseKzPdf(buf){
+  const lib=await loadPdf();
+  const pdf=await lib.getDocument({data:new Uint8Array(buf)}).promise;
+  const p1=await pdf.getPage(1);
+  const t1=(await p1.getTextContent()).items.map(i=>i.str).join(' ');
+  const m1=t1.match(/ЖСК\s*\/\s*ИИК[\s:]+(\S+)/);
+  const m2=t1.match(/Валюта[\s:]+([A-Z]{3})/);
+  const ourAcc=m1?m1[1]:'';
+  const cur=m2?m2[1]:'KZT';
+  const out=[];
+
+  for(let pn=1;pn<=pdf.numPages;pn++){
+    const page=await pdf.getPage(pn);
+    const vp=page.getViewport({scale:1});
+    const tc=await page.getTextContent();
+    const items=tc.items
+      .filter(i=>i.str&&i.str.trim())
+      .map(i=>({text:i.str.trim(),x:i.transform[4],y:vp.height-i.transform[5]}));
+    const rg=groupRows(items,6);
+
+    // Find header row containing both "Дата" and "Дебет"
+    let hIdx=-1,colB=null;
+    for(let gi=0;gi<rg.length;gi++){
+      const txt=rg[gi].map(i=>i.text).join(' ');
+      if((txt.includes('Дата')||txt.includes('Күні'))&&(txt.includes('Дебет')||txt.includes('КНП'))){
+        const xs=rg[gi].map(i=>i.x).sort((a,b)=>a-b);
+        colB=[...xs,vp.width+100];
+        hIdx=gi; break;
+      }
+    }
+    if(!colB||hIdx<0) continue;
+
+    // Parse data rows
+    let cur_rec=null; const recs=[];
+    for(const grp of rg.slice(hIdx+1)){
+      const first=grp[0].text;
+      // New record: starts with NT-, a number, or contains a date
+      const isNew=/^NT[-\s]?\d|^\d+$/.test(first)||/\d{2}\.\d{2}\.\d{3}/.test(grp.map(i=>i.text).join(''));
+      if(isNew){if(cur_rec) recs.push(cur_rec); cur_rec=new Array(colB.length).fill('');}
+      if(!cur_rec) cur_rec=new Array(colB.length).fill('');
+      for(const it of grp){
+        const ci=Math.min(assignCol(it.x,colB),cur_rec.length-1);
+        cur_rec[ci]=(cur_rec[ci]+' '+it.text).trim();
+      }
+    }
+    if(cur_rec) recs.push(cur_rec);
+
+    for(const rec of recs){
+      // Find date column
+      let dci=-1;
+      for(let ci=0;ci<Math.min(rec.length,4);ci++){
+        if(/\d{2}\.\d{2}\.\d{3}/.test(rec[ci])){dci=ci;break;}
+      }
+      if(dci<0) continue;
+      const off=dci;
+      const docN=dci>0?rec[0]:'';
+      const dateRaw=rec[off];
+      const bikV=rec[off+1]||'';
+      const iikV=rec[off+2]||'';
+      const binF=cid(rec[off+3]||'');
+      const cpNm=cl(rec[off+4]||'');
+      const binT=cid(rec[off+5]||'');
+      const debS=rec[off+6]||'';
+      const creS=rec[off+7]||'';
+      const knpV=rec[off+8]||'';
+      const bankV=rec[off+9]||'';
+      const purpV=rec[off+10]||'';
+
+      const deb=amt(debS),cre=amt(creS);
+      let dir,a,cpId;
+      if(deb&&deb>0){dir='РАСХОД';a=deb;cpId=binT;}
+      else if(cre&&cre>0){dir='ПРИХОД';a=cre;cpId=binF;}
+      else continue;
+      if(cpId===OUR_BIN_KZ) cpId='';
+      if(!cpNm||cpNm.length<2) continue;
+      const dt=fmtDate(dateRaw);
+      if(!dt||!dt.match(/^\d{4}/)) continue;
+
+      out.push(mk({company:'ДримСофт KZ',our_account:ourAcc,
+        doc_number:cl(docN),date:dt,direction:dir,amount:a,currency:cur,
+        counterparty_name:cpNm,counterparty_id:cpId.length>=10?cpId:'',counterparty_id_type:'БИН',
+        counterparty_account:cid(iikV),counterparty_bank:cl(bankV),
+        counterparty_bik:cl(bikV),payment_code:cl(knpV),purpose:cl(purpV)}));
+    }
+  }
+  return out;
+}
+
+// ── process file ────────────────────────────────────────────────────────────
+async function processFile(f){
+  const n=f.name.toLowerCase();
+  const buf=await f.arrayBuffer();
+  if(n.endsWith('.pdf')) return parseKzPdf(buf);
+  if(n.endsWith('.xlsx')||n.endsWith('.xls')){
+    const wb=XLSX.read(new Uint8Array(buf),{type:'array',raw:false,cellDates:false});
+    switch(detect(wb)){
+      case 'by-income':  return parseByIncome(wb);
+      case 'by-expense': return parseByExpense(wb);
+      case 'ru-tochka':  return parseRuTochka(wb);
+      case 'ru-alfa':    return parseRuAlfa(wb);
+      default: throw new Error('Неизвестный формат: '+f.name);
+    }
+  }
+  throw new Error('Неподдерживаемый тип: '+f.name);
+}
+
+async function handle(flist){
+  if(!flist.length) return;
+  show('load',true);
+  for(const f of flist){
+    if(files.includes(f.name)) continue;
+    try{const r=await processFile(f);rows.push(...r);files.push(f.name);}
+    catch(e){errs.push(f.name+': '+e.message);}
+  }
+  show('load',false);
+  render();
+}
+
+// ── UI ───────────────────────────────────────────────────────────────────────
+function show(id,v){
+  const m={load:'loadDiv',main:'main',empty:'emptyDiv'};
+  document.getElementById(m[id]||id).style.display=v?'':'none';
+}
+
+function render(){
+  const has=rows.length>0;
+  show('empty',!has); show('main',has);
+  if(!has) return;
+  const inc=rows.filter(r=>r.direction==='ПРИХОД').length;
+  document.getElementById('sTotal').textContent=rows.length;
+  document.getElementById('sFiles').textContent=files.length;
+  document.getElementById('sIn').textContent=inc;
+  document.getElementById('sOut').textContent=rows.length-inc;
+  document.getElementById('totalLbl').textContent=rows.length;
+  document.getElementById('fNames').textContent='Файлы: '+files.join(', ');
+  const body=document.getElementById('tb');
+  body.innerHTML=rows.slice(0,300).map(r=>`<tr>
+    <td>${r.date}</td>
+    <td><span class="${r.direction==='ПРИХОД'?'in':'out'}">${r.direction}</span></td>
+    <td style="text-align:right;font-weight:600">${Number(r.amount||0).toLocaleString('ru-RU',{minimumFractionDigits:2})}</td>
+    <td>${r.currency}</td>
+    <td title="${r.counterparty_name}">${r.counterparty_name}</td>
+    <td title="${r.counterparty_id}">${r.counterparty_id}</td>
+    <td title="${r.counterparty_account}">${r.counterparty_account}</td>
+    <td title="${r.counterparty_bank}">${(r.counterparty_bank||'').slice(0,28)}</td>
+    <td>${r.payment_code}</td>
+    <td title="${r.purpose}">${(r.purpose||'').slice(0,45)}</td>
+  </tr>`).join('');
+  if(errs.length){
+    document.getElementById('errDiv').style.display='';
+    document.getElementById('errList').innerHTML=errs.map(e=>`<li>${e}</li>`).join('');
+  }
+}
+
+function clearAll(){rows=[];files=[];errs=[];render();show('empty',true);}
+
+// ── CSV export ───────────────────────────────────────────────────────────────
+function esc(v){
+  const s=String(v??'');
+  return (s.includes(',')||s.includes('"')||s.includes('\n'))
+    ?'"'+s.replace(/"/g,'""')+'"':s;
+}
+function dlCSV(){
+  const hdr=FIELDS.join(',');
+  const body=rows.map(r=>FIELDS.map(f=>esc(r[f])).join(',')).join('\n');
+  const blob=new Blob(['\uFEFF'+hdr+'\n'+body],{type:'text/csv;charset=utf-8'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='transactions_'+new Date().toISOString().slice(0,10)+'.csv';
+  a.click(); URL.revokeObjectURL(a.href);
+}
+
+// ── drag & drop ──────────────────────────────────────────────────────────────
+const dz=document.getElementById('dz'),fi=document.getElementById('fi');
+dz.addEventListener('dragover',e=>{e.preventDefault();dz.classList.add('over')});
+dz.addEventListener('dragleave',()=>dz.classList.remove('over'));
+dz.addEventListener('drop',e=>{e.preventDefault();dz.classList.remove('over');handle([...e.dataTransfer.files])});
+fi.addEventListener('change',e=>{handle([...e.target.files]);fi.value='';});
+</script>
+</body>
+</html>

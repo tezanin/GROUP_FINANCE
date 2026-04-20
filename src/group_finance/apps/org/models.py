@@ -4,11 +4,17 @@ from django.core.exceptions import ValidationError
 from group_finance.apps.core.models import ActiveMixin, NoteMixin, TimeStampedModel, CodeMixin
 from group_finance.apps.core.utils.code_generator import generate_unique_code
 
-class Company(TimeStampedModel, NoteMixin, ActiveMixin):
+class Company(CodeMixin, TimeStampedModel, NoteMixin, ActiveMixin):
     class CompanyType(models.TextChoices):
         LEGAL_ENTITY = "legal_entity", "Юрлицо"
         INDIVIDUAL = "individual", "Физлицо/ИП"
-
+    code = models.CharField(
+        "Код",
+        max_length=20,
+        unique=True,
+        blank=True,
+        help_text="Если оставить пустым, код будет сгенерирован автоматически.",
+    )
     name = models.CharField("Название", max_length=255)
     short_name = models.CharField("Краткое название", max_length=100, blank=True)
     company_type = models.CharField(
@@ -65,7 +71,7 @@ class BusinessDirection(CodeMixin, TimeStampedModel, NoteMixin, ActiveMixin):
     def __str__(self) -> str:
         company_name = self.company.short_name or self.company.name
         return f"{self.name} ({company_name})"
-    
+
 class Client(TimeStampedModel, NoteMixin, ActiveMixin):
     name = models.CharField("Название", max_length=255)
     company = models.ForeignKey(
@@ -138,11 +144,11 @@ class Project(CodeMixin, TimeStampedModel, NoteMixin, ActiveMixin):
                 raise ValidationError({
                     "business_direction": "Направление бизнеса должно относиться к выбранной компании."
                 })
-    
+
 #    def save(self, *args, **kwargs):
 #        self.full_clean()
 #        super().save(*args, **kwargs)
-            
+
     def __str__(self) -> str:
         return self.name
 
