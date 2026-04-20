@@ -20,7 +20,12 @@ build/
 
 #backup
 backups/
+*.sql
+*.dump
 
 #documents
 doc/
 docs/
+
+#venv
+.venv/
