@@ -29,3 +29,6 @@ docs/
 
 #venv
 .venv/
+
+#md
+md_scripts/

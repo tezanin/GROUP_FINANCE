@@ -3,7 +3,7 @@ from __future__ import annotations
 import csv
 from dataclasses import dataclass
 from datetime import date
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from pathlib import Path
 from typing import Any
 
@@ -222,6 +222,12 @@ def build_bank_transaction(parsed: ParsedBankRow) -> BankTransaction:
             f"[bank_import] Курс не найден: {currency.code} "
             f"{parsed.transaction_date:%Y-%m} — amount_rub=NULL"
         )
+
+    # Квантуем до 2 знаков после запятой — столько decimal_places в модели.
+    # Без этого full_clean() ругается: умножение Decimal(2 знака) * Decimal(8 знаков)
+    # даёт 10 знаков после запятой.
+    if amount_rub is not None:
+        amount_rub = amount_rub.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
     bank_tx = BankTransaction(
         company=company,
