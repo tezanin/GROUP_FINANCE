@@ -60,7 +60,6 @@ REQUIRED_COLUMNS = (
     "direction",
     "amount",
     "currency",
-    "purpose",
 )
 EXCHANGE_RATE_SOURCE_CODE = "MANUAL_MONTHLY"
 
