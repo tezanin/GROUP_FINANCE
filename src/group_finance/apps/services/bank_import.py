@@ -14,7 +14,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from group_finance.apps.banking.models import BankTransaction
-from group_finance.apps.core.models import Currency
+from group_finance.apps.core.models import Currency, ExchangeRate
 from group_finance.apps.imports.models import (
     ImportBatch,
     ImportError,
@@ -62,6 +62,7 @@ REQUIRED_COLUMNS = (
     "currency",
     "purpose",
 )
+EXCHANGE_RATE_SOURCE_CODE = "MANUAL_MONTHLY"
 
 
 def parse_row(row: dict[str, Any]) -> ParsedBankRow:
@@ -166,6 +167,28 @@ def resolve_currency(currency_code: str) -> Currency:
         ) from exc
 
 
+def resolve_exchange_rate(
+    currency: Currency,
+    transaction_date: date,
+) -> ExchangeRate | None:
+    """
+    Ищем курс валюты к RUB на месяц операции.
+
+    Возвращает ExchangeRate или None. None — это НЕ ошибка: это штатная
+    ситуация «курса на этот месяц ещё нет, amount_rub посчитаем потом».
+    Транзакции в RUB — особый случай: курс не нужен, возвращаем None без поиска.
+    """
+    if currency.code == "RUB":
+        return None
+
+    month_start = transaction_date.replace(day=1)
+    return ExchangeRate.objects.filter(
+        currency=currency,
+        rate_date=month_start,
+        source__code=EXCHANGE_RATE_SOURCE_CODE,
+    ).first()
+
+
 def build_bank_transaction(parsed: ParsedBankRow) -> BankTransaction:
     """Резолвит FK-справочники и создаёт одну BankTransaction в БД."""
 
@@ -186,6 +209,21 @@ def build_bank_transaction(parsed: ParsedBankRow) -> BankTransaction:
                 code="duplicate",
             )
 
+    # Расчёт amount_rub: для RUB — прямое присвоение, для остальных — по курсу.
+    # Если курса на месяц операции нет — amount_rub=NULL, будем добивать через
+    # rerun_backfill после дозаливки курсов. Это штатно, не ошибка.
+    exchange_rate = resolve_exchange_rate(currency, parsed.transaction_date)
+    if currency.code == "RUB":
+        amount_rub = parsed.amount
+    elif exchange_rate is not None:
+        amount_rub = parsed.amount * exchange_rate.rate_to_rub
+    else:
+        amount_rub = None
+        print(
+            f"[bank_import] Курс не найден: {currency.code} "
+            f"{parsed.transaction_date:%Y-%m} — amount_rub=NULL"
+        )
+
     bank_tx = BankTransaction(
         company=company,
         bank_account=bank_account,
@@ -195,7 +233,10 @@ def build_bank_transaction(parsed: ParsedBankRow) -> BankTransaction:
         direction=parsed.direction,
         description=parsed.purpose,
         external_id=parsed.external_id,
+        amount_rub=amount_rub,
+        exchange_rate=exchange_rate,
     )
+
     # full_clean() прогоняет model.clean() — там проверка, что счёт
     # принадлежит выбранной компании. Хотим, чтобы поймалось до INSERT.
     # Django бросает свой ValidationError — конвертируем в наш BankImportError,
