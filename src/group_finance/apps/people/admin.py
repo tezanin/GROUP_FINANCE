@@ -1,43 +1,101 @@
 from django.contrib import admin
 
-from .models import Employee
+from .models import Person, PersonCompanyEngagement
 
 
-@admin.register(Employee)
-class EmployeeAdmin(admin.ModelAdmin):
+# ---------------------
+# Person
+# ---------------------
+@admin.register(Person)
+class PersonAdmin(admin.ModelAdmin):
     list_display = (
-        "full_name",
-        "company",
-        "employment_type",
-        "position",
+        "display_name_or_fallback",
+        "last_name",
+        "first_name",
         "email",
         "is_active",
     )
-    search_fields = ("full_name", "email", "position", "company__name")
-    list_filter = ("company", "employment_type", "is_active")
-    autocomplete_fields = ("company", "user")
+    search_fields = (
+        "last_name",
+        "first_name",
+        "middle_name",
+        "display_name",
+        "email",
+        "external_id",
+    )
+    list_filter = ("is_active",)
+    autocomplete_fields = ("user",)
+    ordering = ("last_name", "first_name")
 
     fieldsets = (
         ("Основное", {
             "fields": (
-                "full_name",
-                "company",
-                "user",
-                "employment_type",
-                "position",
+                "last_name",
+                "first_name",
+                "middle_name",
+                "display_name",
             )
         }),
         ("Контакты", {
             "fields": ("email",)
         }),
-        ("Даты", {
+        ("Дополнительно", {
             "fields": (
-                "hire_date",
-                "fire_date",
+                "user",
+                "external_id",
+                "is_active",
+                "note",
+            )
+        }),
+    )
+
+    @admin.display(description="Имя")
+    def display_name_or_fallback(self, obj):
+        return str(obj)
+
+
+# ---------------------
+# PersonCompanyEngagement
+# ---------------------
+@admin.register(PersonCompanyEngagement)
+class PersonCompanyEngagementAdmin(admin.ModelAdmin):
+    list_display = (
+        "person",
+        "company",
+        "engagement_type",
+        "job_title",
+        "start_date",
+        "end_date",
+        "is_active",
+    )
+    list_filter = ("company", "engagement_type", "is_active")
+    search_fields = (
+        "person__last_name",
+        "person__first_name",
+        "job_title",
+        "external_id",
+    )
+    autocomplete_fields = ("person", "company")
+    ordering = ("person__last_name", "person__first_name")
+
+    fieldsets = (
+        ("Основное", {
+            "fields": (
+                "person",
+                "company",
+                "engagement_type",
+                "job_title",
+            )
+        }),
+        ("Период", {
+            "fields": (
+                "start_date",
+                "end_date",
             )
         }),
         ("Дополнительно", {
             "fields": (
+                "external_id",
                 "is_active",
                 "note",
             )

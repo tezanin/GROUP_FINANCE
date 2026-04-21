@@ -43,6 +43,7 @@ INSTALLED_APPS = [
     "group_finance.apps.expenses",
     "group_finance.apps.revenue",
     "group_finance.apps.analytics",
+    "group_finance.apps.reports",
 ]
 
 MIDDLEWARE = [

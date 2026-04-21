@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="ru">
+    <head>
+        <meta charset="UTF-8" />
+        <title>ДДС за {{ year }} год</title>
+        <style>
+            body {
+                font-family: sans-serif;
+                padding: 20px;
+            }
+            h1 {
+                color: #2c3e50;
+            }
+            table {
+                border-collapse: collapse;
+                margin-top: 10px;
+            }
+            th,
+            td {
+                border: 1px solid #ccc;
+                padding: 6px 10px;
+            }
+            th {
+                background: #3a7ca5;
+                color: white;
+                text-align: left;
+            }
+            td.num {
+                text-align: right;
+                font-family: monospace;
+            }
+            td.zero {
+                color: #bbb;
+            }
+            tr:nth-child(even) {
+                background: #f5f5f5;
+            }
+            .company-header {
+                background: #2c3e50;
+                color: white;
+                padding: 8px;
+                margin-top: 24px;
+            }
+        </style>
+    </head>
+    <body>
+        <h1>ДДС-отчёт за {{ year }} год</h1>
+
+        {% for company_name, company_rows in rows_by_company.items %}
+        <div class="company-header">{{ company_name }}</div>
+        <table>
+            <thead>
+                <tr>
+                    <th>Валюта</th>
+                    <th>Месяц</th>
+                    <th>Приход (ориг.)</th>
+                    <th>Расход (ориг.)</th>
+                    <th>Приход (RUB)</th>
+                    <th>Расход (RUB)</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in company_rows %}
+                <tr>
+                    <td>{{ row.currency }}</td>
+                    <td>{{ row.month|date:"Y-m" }}</td>
+                    <td class="num {% if not row.inflow_orig %}zero{% endif %}">
+                        {{ row.inflow_orig|default_if_none:0|floatformat:2 }}
+                    </td>
+                    <td
+                        class="num {% if not row.outflow_orig %}zero{% endif %}"
+                    >
+                        {{ row.outflow_orig|default_if_none:0|floatformat:2 }}
+                    </td>
+                    <td class="num {% if not row.inflow_rub %}zero{% endif %}">
+                        {{ row.inflow_rub|default_if_none:0|floatformat:2 }}
+                    </td>
+                    <td class="num {% if not row.outflow_rub %}zero{% endif %}">
+                        {{ row.outflow_rub|default_if_none:0|floatformat:2 }}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% endfor %}
+
+        <p style="margin-top: 30px; color: #888">
+            Всего строк: {{ total_rows }}
+        </p>
+    </body>
+</html>
