@@ -1,5 +1,6 @@
 from django.core.exceptions import ValidationError
 from django.db import models
+from django.db.models import Q
 
 from group_finance.apps.core.models import Currency, NoteMixin, TimeStampedModel
 from group_finance.apps.org.models import BankAccount, Company
@@ -18,11 +19,33 @@ class BankTransaction(TimeStampedModel, NoteMixin):
     direction = models.CharField("Направление", max_length=20, choices=Direction.choices)
     description = models.TextField("Описание", blank=True)
     external_id = models.CharField("Внешний ID", max_length=255, blank=True)
+    amount_rub = models.DecimalField(
+        "Сумма в RUB",
+        max_digits=20,
+        decimal_places=2,
+        null=True,
+        blank=True,
+    )
+    exchange_rate = models.ForeignKey(
+        "core.ExchangeRate",
+        on_delete=models.PROTECT,
+        related_name="bank_transactions",
+        null=True,
+        blank=True,
+        verbose_name="Применённый курс",
+    )
 
     class Meta:
         verbose_name = "Банковская операция"
         verbose_name_plural = "Банковские операции"
         ordering = ("-transaction_date", "-id")
+        constraints = [
+            models.UniqueConstraint(
+                fields=["company", "external_id"],
+                condition=Q(external_id__gt=""),
+                name="unique_bank_transaction_external_id_per_company",
+            ),
+        ]
 
     def clean(self):
         super().clean()
